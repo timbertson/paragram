@@ -1,0 +1,67 @@
+import process
+
+_main = None
+
+class LazyMain(process.Process):
+	def __getattr__(self, attr):
+		return getattr(_init_main(), attr)
+
+	def __setattr__(self, attr, val):
+		setattr(_init_main(), attr, val)
+
+main = LazyMain()
+
+def _set_foreign_main(proc):
+	global _main
+	_main = MainProcess(proc)
+
+def _init_main():
+	global _main, main
+	if _main is None:
+		_main = MainProcess()
+		main = _main
+	return _main
+
+class MainProcess(process.Process):
+	_denied_remote_attrs = ('receive','spawn')
+	def __init__(self, proc=None):
+		self.remote = proc is not None
+		if proc is None:
+			self._proc = ExistingProcess()
+		else:
+			self._proc = proc
+
+	def __getattr__(self, attr):
+		if self.remote and attr in self._denied_remote_attrs:
+			raise AttributeError(attr)
+		return getattr(self._proc, attr)
+
+class ExistingProcess(process.ThreadProcess):
+	def __init__(self):
+		import threading
+		self._lock = threading.Lock()
+		super(ExistingProcess, self).__init__(target=lambda x: None, link=None, name='__main__')
+
+	def _receive(self, msg):
+		"""the main thread is the only process whose
+		receiver pool can be modified by other threads, and therefore
+		requires a lock
+		"""
+		with self._lock:
+			super(ExistingProcess, self)._receive(msg)
+	
+	def _exit(self):
+		#TODO: collect procs and kill them gracefully?
+		super(ExistingProcess, self)._exit()
+		if self._auto_exit:
+			import thread
+			thread.interrupt_main()
+	
+	def _reset(self):
+		"""private method called from tests"""
+		import sys
+		print >> sys.stderr, "resetting.."
+		global main
+		main = LazyMain()
+
+
