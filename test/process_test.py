@@ -1,12 +1,18 @@
 from unittest import TestCase
 import multiprocessing
 from Queue import Empty
-import candygram as cg
 import time
+import candygram as cg
 
 output = None
 main = None
 import logging
+
+def chain(*fns):
+	def _(*a, **kw):
+		for fn in fns:
+			fn(*a, **kw)
+	return _
 
 class Ponger(object):
 	def __init__(self, proc):
@@ -32,10 +38,10 @@ class ProcessTest(TestCase):
 		global output, main
 		output = multiprocessing.Queue()
 		main = cg.main
-		cg.main._auto_exit = False
 	
 	def tearDown(self):
-		time.sleep(0.2)
+		cg.main.terminate()
+		cg.main.wait()
 	
 	@property
 	def events(self):
@@ -48,8 +54,11 @@ class ProcessTest(TestCase):
 		except Empty: pass
 		return events
 
-	def log_message(self, message, caused_by):
-		output.put((message, caused_by.name))
+	def log_message(self, *a):
+		output.put(tuple(map(str, a)))
+	
+	def exit(self, *a):
+		raise cg.process.Exit
 
 	def test_should_spawn_a_link(self):
 		proc = main.spawnLink(Ponger, name='ponger')
@@ -58,8 +67,9 @@ class ProcessTest(TestCase):
 			proc.terminate()
 
 		main.receive['pong', cg.Process] = end
-		main.receive['EXIT', cg.Process] = self.log_message
+		main.receive['EXIT', cg.Process] = chain(self.log_message, self.exit)
 		proc.send('ping', main)
+		main.wait()
 
 		self.assertEquals(self.events, [
 			('ping', '__main__'),
@@ -68,20 +78,37 @@ class ProcessTest(TestCase):
 		])
 
 	def test_should_die_on_unknown_message(self):
-		proc = main.spawnLink(Ponger, name='ponger')
+		proc = main.spawn(Ponger, name='ponger')
 		proc.send('unknown')
-
-		self.assertEquals(self.events, [
-			('ping', '__main__'),
-			('pong', 'ponger'),
-			('EXIT', 'ponger'),
-		])
-
-	def test_should_ignore_standard_errors_in_filter_matching(self):
-		pass
+		time.sleep(1)
+		self.assertFalse(proc.is_alive())
 
 	def test_should_send_exit_to_linked_process(self):
-		pass
+		def second_proc(proc):
+			proc.receive['die'] = chain(self.log_message, self.exit)
+
+		def first_proc(proc):
+			@proc.receiver('spawn', cg.Process)
+			def spawn(msg, main_proc):
+				self.log_message(msg, main_proc)
+				new_proc = proc.spawnLink(second_proc, name="second_proc")
+				main_proc.send('spawned', new_proc)
+			proc.receive[cg.EXIT, cg.Process] = chain(self.log_message, self.exit)
+
+		import os
+		print os.getpid()
+		main.receive['spawned', cg.Process] = lambda msg, new_proc: new_proc.terminate()
+		first = main.spawn(first_proc, 'first_proc')
+		first.send('spawn', main)
+		first.wait()
+
+		self.assertEquals(self.events, [
+			('spawn', '__main__'),
+			('spawned', 'second_proc'),
+			('die',),
+			('EXIT', 'second_proc'),
+
+		])
 	
 	def test_killing_main_should_kill__all__processes(self):
 		pass

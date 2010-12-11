@@ -1,2 +1,2 @@
-from process import Process
+from process import Process, EXIT, Exit
 from main import main

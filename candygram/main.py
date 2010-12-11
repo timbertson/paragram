@@ -1,4 +1,6 @@
 import process
+import logging
+log = logging.getLogger(__name__)
 
 _main = None
 
@@ -8,7 +10,11 @@ class LazyMain(process.Process):
 
 	def __setattr__(self, attr, val):
 		setattr(_init_main(), attr, val)
+	
+	def __repr__(self): return "<#Process: __main__>"
+	def __str__(self): return "__main__"
 
+#TODO: should this only ever be accessible from the first process?
 main = LazyMain()
 
 def _set_foreign_main(proc):
@@ -16,10 +22,9 @@ def _set_foreign_main(proc):
 	_main = MainProcess(proc)
 
 def _init_main():
-	global _main, main
+	global _main
 	if _main is None:
 		_main = MainProcess()
-		main = _main
 	return _main
 
 class MainProcess(process.Process):
@@ -40,7 +45,7 @@ class ExistingProcess(process.ThreadProcess):
 	def __init__(self):
 		import threading
 		self._lock = threading.Lock()
-		super(ExistingProcess, self).__init__(target=lambda x: None, link=None, name='__main__')
+		super(ExistingProcess, self).__init__(target=lambda x: None, link=None, name='__main__', daemon=False)
 
 	def _receive(self, msg):
 		"""the main thread is the only process whose
@@ -50,18 +55,18 @@ class ExistingProcess(process.ThreadProcess):
 		with self._lock:
 			super(ExistingProcess, self)._receive(msg)
 	
-	def _exit(self):
-		#TODO: collect procs and kill them gracefully?
-		super(ExistingProcess, self)._exit()
-		if self._auto_exit:
-			import thread
-			thread.interrupt_main()
+	def wait(self):
+		super(ExistingProcess, self).wait()
+		self._reset()
 	
+	def _exit(self):
+		super(ExistingProcess, self)._exit()
+		process._kill_children(self)
+
 	def _reset(self):
-		"""private method called from tests"""
-		import sys
-		print >> sys.stderr, "resetting.."
-		global main
-		main = LazyMain()
+		"""really only makes sense for tests"""
+		log.debug("resetting..")
+		global _main
+		_main = None
 
 
