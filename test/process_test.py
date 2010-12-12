@@ -16,7 +16,6 @@ def chain(*fns):
 
 class Ponger(object):
 	def __init__(self, proc):
-		logging.warn("started")
 		self.proc = proc
 		self.proc.receive['ping', cg.Process] = self.ping
 		self.proc.receive['go away'] = self.exit_gracefully

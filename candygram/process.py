@@ -12,7 +12,8 @@ log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
 EXIT = 'EXIT'
-__EXIT__ = '__exit__'
+# an internal message used for killing off duplicated ThreadProcess objects
+__EXIT__ = ('__exit_silently__',)
 
 # a thread-safe queue is fine here, each spawned process will
 # reset its list of _child_process_inputs
@@ -98,7 +99,6 @@ class BaseProcess(ProcessAPI):
 		return BaseProcess._manager
 	
 	def _exit_handler(self, exit, proc=None):
-		log.warn("default _exit_handler called!")
 		self.send(EXIT)
 	
 	def _get(self):
@@ -111,7 +111,7 @@ class BaseProcess(ProcessAPI):
 				pickled = self._get()
 				self._receive(pickle.loads(pickled))
 		except SilentExit:
-			log.debug("%r exiting silently" % (self,))
+			log.debug("duplicate %r exiting silently" % (self,))
 		except Exit:
 			self._exit()
 		except UnhandledMessage, e:
@@ -131,8 +131,7 @@ class BaseProcess(ProcessAPI):
 	def _receive(self, msg):
 		log.debug("%r received message: %r" % (self, msg))
 		matched = False
-		print repr(self._handlers)
-		if msg == (__EXIT__,):
+		if msg == __EXIT__:
 			raise SilentExit()
 		for filter, handler in self._handlers + [(self._exit_filter, self._exit_handler)]:
 			matched = False
@@ -145,7 +144,6 @@ class BaseProcess(ProcessAPI):
 				else:
 					args = (msg,)
 				handler(*args)
-				matched = True
 				break
 
 		if msg == (EXIT,):
@@ -153,8 +151,6 @@ class BaseProcess(ProcessAPI):
 			raise Exit()
 
 		if not matched:
-			matched = False
-			log.debug("nothing matched!")
 			raise UnhandledMessage(msg)
 	
 	def is_alive(self):
@@ -193,11 +189,10 @@ class OSProcess(BaseProcess):
 	
 	def _kill_existing_threads(self):
 		global _process_threads
-		log.warn("%s (pid %d) terminating running threads.." % (self, os.getpid()))
+		log.debug("%s (pid %d) terminating newly-duplicated threads.." % (self, os.getpid()))
 		try:
 			while True:
 				_process_threads.get(False)._die_silently()
-				log.warn("got one!")
 		except queue.Empty: pass
 		_process_threads = queue.Queue()
 
@@ -239,13 +234,12 @@ class ThreadProcess(BaseProcess):
 			try:
 				while True:
 					val = self._queue.get()
-					log.info("%r main pid is %s, and ospid is %s" % (self, self.pid, os.getpid()))
 					if os.getpid() != self.pid:
 						# we've been forked - abort!
-						log.warn("duplicate thread for %r dying" % (self,))
+						log.warn("feeder thread for duplicate %r got first message - dying" % (self,))
 						self._queue.put(val)
+						self._die_silently()
 						break
-					log.debug("FEEDING: %r" % (pickle.loads(val),))
 					self._private_queue.put(val)
 			except (queue.Empty, EOFError): pass
 
@@ -254,13 +248,10 @@ class ThreadProcess(BaseProcess):
 		feeder.start()
 	
 	def _get(self):
-		log.warn("QUEUE")
 		return self._private_queue.get()
 	
 	def _die_silently(self):
-		log.debug("%r, die_silently" % (self,))
 		self._private_queue.put(pickle.dumps(__EXIT__))
-
 
 class ProxyProcess(ProcessAPI):
 	def __init__(self, name, queue, pid):
@@ -269,7 +260,7 @@ class ProxyProcess(ProcessAPI):
 		self.pid = pid
 
 def _kill_children(self):
-	log.warn("%s (pid %d) terminating child processes.." % (self, os.getpid()))
+	log.debug("%s (pid %d) terminating child processes.." % (self, os.getpid()))
 	try:
 		while True:
 			_child_process_inputs.get(False).put(pickle.dumps(EXIT))
