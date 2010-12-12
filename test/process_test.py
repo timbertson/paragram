@@ -51,16 +51,22 @@ def spawner(link_to_spawned, on_exit=None):
 
 
 
-
-class ProcessTest(TestCase):
+class AbstractProcessTest(object):
+	"""
+	common test cases that apply to both OSProcess
+	and ThreadProcess-based Processes
+	"""
 	def setUp(self):
 		"""Set up the output event queue"""
 		global output, main
+		self._original_process_type = cg.process.default_type
+		cg.process.default_type = self.process_type
 		output = multiprocessing.Queue()
 		main = cg.main
 	
 	def tearDown(self):
 		"""make sure the main process finishes between runs"""
+		cg.process.default_type = self._original_process_type
 		cg.main.terminate()
 		cg.main.wait()
 
@@ -126,25 +132,6 @@ class ProcessTest(TestCase):
 		])
 
 	
-	def test_killing_main_should_kill__all__processes(self):
-		def monitor_exit(proc):
-			proc.receive[cg.EXIT] = log_message
-		
-		one = main.spawn(monitor_exit, 'one')
-		two = main.spawn(monitor_exit, 'two')
-		main.terminate()
-		one.wait(1)
-		two.wait(1)
-		self.assertFalse(one.is_alive())
-		self.assertFalse(two.is_alive())
-
-		# expect one exit message for each child
-		self.assertEquals(self.events, [
-			(cg.EXIT,),
-			(cg.EXIT,),
-		])
-
-
 	def test_should_not_send_exit_message_to_non_linked_processes(self):
 		self.kill_on_spawned()
 		first = main.spawn(spawner(link_to_spawned=False, on_exit=log_and_exit), 'first_proc')
@@ -182,6 +169,12 @@ class ProcessTest(TestCase):
 			(cg.EXIT, 'dying_proc'),
 		])
 
+	def kill_on_spawned(self):
+		main.receive['spawned', cg.Process] = log_and(lambda msg, new_proc: new_proc.send('die'))
+
+
+class OSProcessTest(AbstractProcessTest, TestCase):
+	process_type = cg.process.OSProcess
 
 	def test_only_root_process_can_add_receive_to_main(self):
 		def first_proc(proc):
@@ -201,6 +194,24 @@ class ProcessTest(TestCase):
 			('NotMainProcessError',),
 		])
 	
-	def kill_on_spawned(self):
-		main.receive['spawned', cg.Process] = log_and(lambda msg, new_proc: new_proc.send('die'))
+	def test_killing_main_should_kill__all__processes(self):
+		def monitor_exit(proc):
+			proc.receive[cg.EXIT] = log_message
+		
+		one = main.spawn(monitor_exit, 'one')
+		two = main.spawn(monitor_exit, 'two')
+		main.terminate()
+		one.wait(1)
+		two.wait(1)
+		self.assertFalse(one.is_alive())
+		self.assertFalse(two.is_alive())
 
+		# expect one exit message for each child
+		self.assertEquals(self.events, [
+			(cg.EXIT,),
+			(cg.EXIT,),
+		])
+
+
+class ThreadProcessTest(AbstractProcessTest, TestCase):
+	process_type = cg.process.ThreadProcess
