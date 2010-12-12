@@ -20,6 +20,9 @@ __EXIT__ = ('__exit_silently__',)
 _child_process_inputs = queue.Queue()
 _process_threads = queue.Queue()
 
+def _send(queue, *msg):
+	queue.put(pickle.dumps(msg))
+
 class Process(object):
 	"""empty class for the purpose of inheritance"""
 	pass
@@ -251,7 +254,7 @@ class ThreadProcess(BaseProcess):
 		return self._private_queue.get()
 	
 	def _die_silently(self):
-		self._private_queue.put(pickle.dumps(__EXIT__))
+		_send(self._private_queue, __EXIT__)
 
 class ProxyProcess(ProcessAPI):
 	def __init__(self, name, queue, pid):
@@ -263,7 +266,8 @@ def _kill_children(self):
 	log.debug("%s (pid %d) terminating child processes.." % (self, os.getpid()))
 	try:
 		while True:
-			_child_process_inputs.get(False).put(pickle.dumps(EXIT))
+			q = _child_process_inputs.get(False)
+			_send(q, EXIT)
 	except queue.Empty:
 		pass
 

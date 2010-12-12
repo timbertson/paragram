@@ -34,7 +34,7 @@ class MainProcess(process.ThreadProcess):
 		if MainProcess.pid is None:
 			MainProcess.pid = os.getpid()
 		else:
-			raise RuntimeError("pid %s is not the initial process (%s)" % (os.getpid(), MainProcess.pid))
+			raise NotMainProcessError(MainProcess.pid)
 		super(MainProcess, self).__init__(target=lambda x: None, link=None, name='__main__', daemon=False)
 
 	def _receive(self, msg):
@@ -60,4 +60,9 @@ class MainProcess(process.ThreadProcess):
 		_main = None
 		MainProcess.pid = None
 
+class NotMainProcessError(RuntimeError):
+	def __str__(self):
+		initial_pid, = self.args
+		this_pid = os.getpid()
+		return "pid %s is not the main process (%s)" % (this_pid, initial_pid)
 
