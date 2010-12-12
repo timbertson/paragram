@@ -9,10 +9,10 @@ main = None
 import logging
 
 def chain(*fns):
-	def _(*a, **kw):
+	def chained_func(*a, **kw):
 		for fn in fns:
 			fn(*a, **kw)
-	return _
+	return chained_func
 
 class Ponger(object):
 	def __init__(self, proc):
@@ -80,34 +80,34 @@ class ProcessTest(TestCase):
 	def test_should_die_on_unknown_message(self):
 		proc = main.spawn(Ponger, name='ponger')
 		proc.send('unknown')
-		time.sleep(1)
+		proc.wait(1)
 		self.assertFalse(proc.is_alive())
 
 	def test_should_send_exit_to_linked_process(self):
-		def second_proc(proc):
+		def dying_proc(proc):
 			proc.receive['die'] = chain(self.log_message, self.exit)
 
 		def first_proc(proc):
 			@proc.receiver('spawn', cg.Process)
 			def spawn(msg, main_proc):
 				self.log_message(msg, main_proc)
-				new_proc = proc.spawnLink(second_proc, name="second_proc")
+				new_proc = proc.spawnLink(dying_proc, name="dying_proc")
 				main_proc.send('spawned', new_proc)
 			proc.receive[cg.EXIT, cg.Process] = chain(self.log_message, self.exit)
 
 		import os
 		print os.getpid()
-		main.receive['spawned', cg.Process] = lambda msg, new_proc: new_proc.terminate()
+		main.receive['spawned', cg.Process] = chain(self.log_message, lambda msg, new_proc: new_proc.send('die'))
 		first = main.spawn(first_proc, 'first_proc')
 		first.send('spawn', main)
 		first.wait()
 
 		self.assertEquals(self.events, [
 			('spawn', '__main__'),
-			('spawned', 'second_proc'),
+			('spawned', 'dying_proc'),
 			('die',),
-			('EXIT', 'second_proc'),
-
+			# we send 'die' to dying_proc, and it sends EXIT to first_proc
+			('EXIT', 'dying_proc'),
 		])
 	
 	def test_killing_main_should_kill__all__processes(self):

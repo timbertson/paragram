@@ -44,7 +44,7 @@ class ProcessAPI(Process):
 		self._queue.put(pickle.dumps(msg))
 
 	def __repr__(self):
-		return "<#%s: %s>" % (type(self).__name__, self.name)
+		return "<#%s: %s [%s]>" % (type(self).__name__, self.name, os.getpid())
 	def __str__(self):
 		return self.name
 
@@ -59,6 +59,10 @@ class BaseReceiver(object):
 	
 class ReceiverSetter(BaseReceiver):
 	__setitem__ = BaseReceiver._add_receiver
+	def __setitem__(self, match, handler):
+		if not isinstance(match, tuple):
+			match = (match,)
+		self._add_receiver(match, handler)
 
 class ReceiverDecorator(BaseReceiver):
 	def __call__(self, *match):
@@ -70,8 +74,9 @@ class ReceiverDecorator(BaseReceiver):
 class BaseProcess(ProcessAPI):
 	_manager = None
 	_next_index = 1
-	"""common methods for typical Process implementations"""
+	"""common methods for local Process implementations"""
 	def __init__(self, target, link, name):
+		self.pid = os.getpid()
 		self.name = name
 		if not self.name:
 			self.name = "%s-%s" % (type(self).__name__, BaseProcess._next_index)
@@ -107,7 +112,6 @@ class BaseProcess(ProcessAPI):
 				self._receive(pickle.loads(pickled))
 		except SilentExit:
 			log.debug("%r exiting silently" % (self,))
-			pass
 		except Exit:
 			self._exit()
 		except UnhandledMessage, e:
@@ -125,7 +129,7 @@ class BaseProcess(ProcessAPI):
 		log.info("process %s ending" % (self.name,))
 
 	def _receive(self, msg):
-		log.debug("%s (%s:%s) received message: %r" % (self.name, os.getpid(), type(self).__name__, msg))
+		log.debug("%r received message: %r" % (self, msg))
 		matched = False
 		print repr(self._handlers)
 		if msg == (__EXIT__,):
@@ -156,14 +160,14 @@ class BaseProcess(ProcessAPI):
 	def is_alive(self):
 		return self._proc.is_alive()
 
-	def wait(self):
-		self._proc.join()
+	def wait(self, timeout=None):
+		self._proc.join(timeout)
 	
 	def __reduce__(self):
 		"""return an object safe for pickling, in this case
 		a proxy object that implements the Process API using only
 		this object's queue"""
-		return (ProxyProcess, (self.name, self._queue))
+		return (ProxyProcess, (self.name, self._queue, self.pid))
 
 class SilentExit(Exception): pass
 class Exit(RuntimeError):
@@ -193,11 +197,10 @@ class OSProcess(BaseProcess):
 		try:
 			while True:
 				_process_threads.get(False)._die_silently()
-				log.warn("got one")
+				log.warn("got one!")
 		except queue.Empty: pass
 		_process_threads = queue.Queue()
 
-	
 	def _init_new_process(self):
 		import main
 		main.main = None
@@ -222,42 +225,37 @@ class ThreadProcess(BaseProcess):
 			pass
 
 		super(ThreadProcess, self).__init__(target, link, **kw)
+		self.pid = os.getpid()
 		self._private_queue = queue.Queue()
-		self._composite_queue = self._make_composite_queue(self._queue, self._private_queue)
+		self._make_queue_feeder()
 		self._proc = threading.Thread(target=self._run, args=(target,), name=self.name)
 		# add self to the list of threads for this process
 		_process_threads.put(self)
 		self._proc.daemon=daemon
 		self._proc.start()
 	
-	def _make_composite_queue(self, a, b):
-		"""
-		we make a composite queue for the thread's input handling, but
-		only ONE of them (self._queue) is exported to other processes.
-		This allows us to send messages to only instances of this thread
-		in the current process, which is unfortunately necessary to kill
-		the damn thing when we start another process!
-		"""
-		comp = queue.Queue()
-		def feed(q):
+	def _make_queue_feeder(self):
+		def feed():
 			try:
 				while True:
-					val = q.get()
-					log.debug("FEEDING: %r" % (pickle.loads(val),))
-					comp.put(val)
-					if pickle.loads(val) == (__EXIT__,):
+					val = self._queue.get()
+					log.info("%r main pid is %s, and ospid is %s" % (self, self.pid, os.getpid()))
+					if os.getpid() != self.pid:
+						# we've been forked - abort!
+						log.warn("duplicate thread for %r dying" % (self,))
+						self._queue.put(val)
 						break
-			except queue.Empty: pass
+					log.debug("FEEDING: %r" % (pickle.loads(val),))
+					self._private_queue.put(val)
+			except (queue.Empty, EOFError): pass
 
-		a_thread = threading.Thread(target=feed, args=(a,))
-		b_thread = threading.Thread(target=feed, args=(a,))
-		a_thread.daemon = b_thread.daemon = True
-		a_thread.start()
-		b_thread.start()
-		return comp
+		feeder = threading.Thread(target=feed)
+		feeder.daemon = True
+		feeder.start()
 	
 	def _get(self):
-		return self._composite_queue.get()
+		log.warn("QUEUE")
+		return self._private_queue.get()
 	
 	def _die_silently(self):
 		log.debug("%r, die_silently" % (self,))
@@ -265,9 +263,10 @@ class ThreadProcess(BaseProcess):
 
 
 class ProxyProcess(ProcessAPI):
-	def __init__(self, name, queue):
+	def __init__(self, name, queue, pid):
 		self.name = name
 		self._queue = queue
+		self.pid = pid
 
 def _kill_children(self):
 	log.warn("%s (pid %d) terminating child processes.." % (self, os.getpid()))
