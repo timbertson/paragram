@@ -1,11 +1,13 @@
-import process
+import os_process
+from base_process import Process
+from thread_process import ThreadProcess
 import logging
 import os
 log = logging.getLogger(__name__)
 
 _main = None
 
-class LazyMain(process.Process):
+class LazyMain(Process):
 	def __getattr__(self, attr):
 		return getattr(_init_main(), attr)
 
@@ -26,7 +28,7 @@ def _init_main():
 		print repr(_main)
 	return _main
 
-class MainProcess(process.ThreadProcess):
+class MainProcess(ThreadProcess):
 	pid = None
 	def __init__(self):
 		import threading
@@ -35,11 +37,12 @@ class MainProcess(process.ThreadProcess):
 			MainProcess.pid = os.getpid()
 		else:
 			raise NotMainProcessError(MainProcess.pid)
+		self._register_in_global_thread_list()
 		super(MainProcess, self).__init__(target=lambda x: None, link=None, name='__main__', daemon=False)
 
 	def _receive(self, msg):
 		"""the main thread is the only process whose
-		receiver pool can be modified by other threads, and therefore
+		receiver set can be modified by other threads, and therefore
 		requires a lock
 		"""
 		with self._lock:
@@ -51,7 +54,7 @@ class MainProcess(process.ThreadProcess):
 	
 	def _exit(self):
 		super(MainProcess, self)._exit()
-		process._kill_children(self)
+		os_process._kill_children(self)
 
 	def _reset(self):
 		"""really only makes sense for tests"""

@@ -40,7 +40,7 @@ def spawner(link_to_spawned, on_exit=None):
 		@proc.receiver('spawn', pg.Process)
 		def spawn(msg, sender):
 			log_message(msg, sender)
-			spawnfn = proc.spawnLink if link_to_spawned else proc.spawn
+			spawnfn = proc.spawn_link if link_to_spawned else proc.spawn
 			new_proc = spawnfn(dying_proc, name="dying_proc")
 			sender.send('spawned', new_proc)
 		if on_exit:
@@ -59,14 +59,14 @@ class AbstractProcessTest(object):
 	def setUp(self):
 		"""Set up the output event queue"""
 		global output, main
-		self._original_process_type = pg.process.default_type
-		pg.process.default_type = self.process_type
+		self._original_process_type = pg.default_type
+		pg.default_type = self.process_type
 		output = multiprocessing.Queue()
 		main = pg.main
 	
 	def tearDown(self):
 		"""make sure the main process finishes between runs"""
-		pg.process.default_type = self._original_process_type
+		pg.default_type = self._original_process_type
 		pg.main.terminate()
 		pg.main.wait()
 
@@ -82,7 +82,7 @@ class AbstractProcessTest(object):
 		return events
 
 	def test_should_spawn_a_link(self):
-		proc = main.spawnLink(ponger, name='ponger')
+		proc = main.spawn_link(ponger, name='ponger')
 		def end(message, sender):
 			output.put((message, sender.name))
 			proc.terminate()
@@ -174,7 +174,7 @@ class AbstractProcessTest(object):
 
 
 class OSProcessTest(AbstractProcessTest, TestCase):
-	process_type = pg.process.OSProcess
+	process_type = pg.OSProcess
 
 	def test_only_root_process_can_add_receive_to_main(self):
 		def first_proc(proc):
@@ -214,4 +214,4 @@ class OSProcessTest(AbstractProcessTest, TestCase):
 
 
 class ThreadProcessTest(AbstractProcessTest, TestCase):
-	process_type = pg.process.ThreadProcess
+	process_type = pg.ThreadProcess
