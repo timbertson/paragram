@@ -1,7 +1,7 @@
 from unittest import TestCase
 import multiprocessing
 from Queue import Empty
-import candygram as cg
+import paragram as pg
 
 output = None
 main = None
@@ -14,13 +14,13 @@ def chain(*fns):
 
 def ponger(proc):
 	"""a process that does what you think it does"""
-	proc.receive['ping', cg.Process] = log_and(lambda msg, sender: sender.send('pong', proc))
+	proc.receive['ping', pg.Process] = log_and(lambda msg, sender: sender.send('pong', proc))
 
 def log_message(*a):
 	output.put(tuple(map(str, a)))
 
 def exit(*a):
-	raise cg.process.Exit
+	raise pg.process.Exit
 
 log_and_exit = chain(log_message, exit)
 def log_and(action):
@@ -37,14 +37,14 @@ def spawner(link_to_spawned, on_exit=None):
 	sending a 'spawned' message back to the sender
 	"""
 	def _spawner(proc):
-		@proc.receiver('spawn', cg.Process)
+		@proc.receiver('spawn', pg.Process)
 		def spawn(msg, sender):
 			log_message(msg, sender)
 			spawnfn = proc.spawnLink if link_to_spawned else proc.spawn
 			new_proc = spawnfn(dying_proc, name="dying_proc")
 			sender.send('spawned', new_proc)
 		if on_exit:
-			proc.receive[cg.EXIT, cg.Process] = on_exit
+			proc.receive[pg.EXIT, pg.Process] = on_exit
 	return _spawner
 
 
@@ -59,16 +59,16 @@ class AbstractProcessTest(object):
 	def setUp(self):
 		"""Set up the output event queue"""
 		global output, main
-		self._original_process_type = cg.process.default_type
-		cg.process.default_type = self.process_type
+		self._original_process_type = pg.process.default_type
+		pg.process.default_type = self.process_type
 		output = multiprocessing.Queue()
-		main = cg.main
+		main = pg.main
 	
 	def tearDown(self):
 		"""make sure the main process finishes between runs"""
-		cg.process.default_type = self._original_process_type
-		cg.main.terminate()
-		cg.main.wait()
+		pg.process.default_type = self._original_process_type
+		pg.main.terminate()
+		pg.main.wait()
 
 	@property
 	def events(self):
@@ -87,8 +87,8 @@ class AbstractProcessTest(object):
 			output.put((message, sender.name))
 			proc.terminate()
 
-		main.receive['pong', cg.Process] = end
-		main.receive['EXIT', cg.Process] = log_and_exit
+		main.receive['pong', pg.Process] = end
+		main.receive['EXIT', pg.Process] = log_and_exit
 		proc.send('ping', main)
 		main.wait()
 
@@ -166,22 +166,22 @@ class AbstractProcessTest(object):
 			('spawn', '__main__'),
 			('spawned', 'dying_proc'),
 			('die',),
-			(cg.EXIT, 'dying_proc'),
+			(pg.EXIT, 'dying_proc'),
 		])
 
 	def kill_on_spawned(self):
-		main.receive['spawned', cg.Process] = log_and(lambda msg, new_proc: new_proc.send('die'))
+		main.receive['spawned', pg.Process] = log_and(lambda msg, new_proc: new_proc.send('die'))
 
 
 class OSProcessTest(AbstractProcessTest, TestCase):
-	process_type = cg.process.OSProcess
+	process_type = pg.process.OSProcess
 
 	def test_only_root_process_can_add_receive_to_main(self):
 		def first_proc(proc):
 			@proc.receiver('go')
 			def go(msg):
 				try:
-					cg.main.receive['foo'] = lambda x: None
+					pg.main.receive['foo'] = lambda x: None
 				except RuntimeError, e:
 					log_message(type(e).__name__)
 				proc.terminate()
@@ -196,7 +196,7 @@ class OSProcessTest(AbstractProcessTest, TestCase):
 	
 	def test_killing_main_should_kill__all__processes(self):
 		def monitor_exit(proc):
-			proc.receive[cg.EXIT] = log_message
+			proc.receive[pg.EXIT] = log_message
 		
 		one = main.spawn(monitor_exit, 'one')
 		two = main.spawn(monitor_exit, 'two')
@@ -208,10 +208,10 @@ class OSProcessTest(AbstractProcessTest, TestCase):
 
 		# expect one exit message for each child
 		self.assertEquals(self.events, [
-			(cg.EXIT,),
-			(cg.EXIT,),
+			(pg.EXIT,),
+			(pg.EXIT,),
 		])
 
 
 class ThreadProcessTest(AbstractProcessTest, TestCase):
-	process_type = cg.process.ThreadProcess
+	process_type = pg.process.ThreadProcess
