@@ -38,7 +38,7 @@ class MainProcess(ThreadProcess):
 		else:
 			raise NotMainProcessError(MainProcess.pid)
 		self._register_in_global_thread_list()
-		super(MainProcess, self).__init__(target=lambda x: None, link=None, name='__main__', daemon=False)
+		super(MainProcess, self).__init__(target=lambda x: None, link=None, name='__main__', daemon=False, args=(), kwargs={})
 
 	def _receive(self, msg):
 		"""the main thread is the only process whose
@@ -52,13 +52,14 @@ class MainProcess(ThreadProcess):
 		super(MainProcess, self).wait(timeout)
 		self._reset()
 	
-	def _exit(self):
-		super(MainProcess, self)._exit()
-		os_process._kill_children(self)
+	def _exit(self, cause):
+		super(MainProcess, self)._exit(cause)
+		os_process._kill_children(self, cause)
 
 	def _reset(self):
 		"""really only makes sense for tests"""
 		log.debug("resetting..")
+		self._error_dict = None
 		global _main
 		_main = None
 		MainProcess.pid = None

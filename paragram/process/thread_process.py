@@ -22,7 +22,7 @@ class ThreadProcess(BaseProcess):
 		self.pid = os.getpid()
 		self._private_queue = queue.Queue()
 		self._make_queue_feeder()
-		self._proc = threading.Thread(target=self._run, args=(target,), name=self.name)
+		self._proc = threading.Thread(target=self._run, name=self.name)
 		# add self to the list of threads for this process
 		self._register_in_global_thread_list()
 		self._proc.daemon=daemon

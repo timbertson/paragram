@@ -6,7 +6,7 @@ import logging
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
-from base_process import BaseProcess, _send, EXIT
+from base_process import BaseProcess, _send, Exit
 
 # a thread-safe queue is fine here, each spawned process will
 # reset its list of _child_process_inputs
@@ -18,7 +18,7 @@ class OSProcess(BaseProcess):
 		super(OSProcess, self).__init__(target, link, **kw)
 		# add our queue to the parent's list of children before we fork()
 		_child_process_inputs.put(self._queue)
-		self._proc = multiprocessing.Process(target=self._run, args=(target,), name=self.name)
+		self._proc = multiprocessing.Process(target=self._run, name=self.name)
 		self._proc.start()
 	
 	def _run(self, *a):
@@ -43,17 +43,19 @@ class OSProcess(BaseProcess):
 		_child_process_inputs = queue.Queue()
 		self._kill_existing_threads()
 	
-	def _exit(self):
-		super(OSProcess, self)._exit()
-		_kill_children(self)
+	def _exit(self, cause):
+		super(OSProcess, self)._exit(cause)
+		_kill_children(self, cause)
 
 
-def _kill_children(self):
-	log.debug("%s (pid %d) terminating child processes.." % (self, os.getpid()))
+def _kill_children(self, cause):
+	log.debug("%s (pid %d) terminating child processes for cause %r" % (self, os.getpid(), cause))
 	try:
 		while True:
 			q = _child_process_inputs.get(False)
-			_send(q, EXIT)
+			log.warn( repr(cause))
+			_send(q, Exit(cause))
 	except queue.Empty:
+		log.debug("done killing")
 		pass
 

@@ -2,9 +2,12 @@ from unittest import TestCase
 import multiprocessing
 from Queue import Empty
 import paragram as pg
+import logging
 
 output = None
 main = None
+
+EXIT = 'EXIT'
 
 def chain(*fns):
 	def chained_func(*a, **kw):
@@ -17,6 +20,7 @@ def ponger(proc):
 	proc.receive['ping', pg.Process] = log_and(lambda msg, sender: sender.send('pong', proc))
 
 def log_message(*a):
+	logging.debug("logging message: %r", a)
 	output.put(tuple(map(str, a)))
 
 def exit(*a):
@@ -44,9 +48,8 @@ def spawner(link_to_spawned, on_exit=None):
 			new_proc = spawnfn(dying_proc, name="dying_proc")
 			sender.send('spawned', new_proc)
 		if on_exit:
-			proc.receive[pg.EXIT, pg.Process] = on_exit
+			proc.receive[pg.Exit, pg.Process] = on_exit
 	return _spawner
-
 
 
 
@@ -63,23 +66,30 @@ class AbstractProcessTest(object):
 		pg.default_type = self.process_type
 		output = multiprocessing.Queue()
 		main = pg.main
+		self._events = []
 	
 	def tearDown(self):
 		"""make sure the main process finishes between runs"""
+		global main
 		pg.default_type = self._original_process_type
 		pg.main.terminate()
 		pg.main.wait()
+		# force main to be garbage collected
+		main = None
 
 	@property
 	def events(self):
-		events = []
 		try:
 			while True:
 				event = output.get(True, 0.2)
 				print " >> " + repr(event)
-				events.append(event)
+				self._events.append(event)
 		except Empty: pass
-		return events
+		return self._events
+
+	def assertSameError(self, expected, actual):
+		self.assertEquals(type(expected), type(actual))
+		self.assertEquals(expected.args, actual.args)
 
 	def test_should_spawn_a_link(self):
 		proc = main.spawn_link(ponger, name='ponger')
@@ -88,15 +98,100 @@ class AbstractProcessTest(object):
 			proc.terminate()
 
 		main.receive['pong', pg.Process] = end
-		main.receive['EXIT', pg.Process] = log_and_exit
+		main.receive[pg.Exit, pg.Process] = log_and_exit
 		proc.send('ping', main)
 		main.wait()
 
 		self.assertEquals(self.events, [
 			('ping', '__main__'),
 			('pong', 'ponger'),
-			('EXIT', 'ponger'),
+			(EXIT, 'ponger'),
 		])
+
+	def test_should_provide_arguments(self):
+		def takes_args(proc, a, b, c):
+			@proc.receiver('main', pg.Process)
+			def main(msg, p):
+				p.send(a + b + c)
+				proc.terminate()
+
+		proc = pg.main.spawn_link(takes_args, args=(1,2), kwargs={'c':3})
+		result = []
+		pg.main.receive[int] = lambda i: result.append(i)
+		proc.send('main', pg.main)
+		proc.wait(1)
+		self.assertEquals(result, [6])
+
+	def test_should_die_on_type_error(self):
+		pg.main.receive[pg.Exit, pg.Process] = log_message
+		proc = main.spawn_link(ponger, name='proc', args=('unexpected',))
+		proc.wait(1)
+		self.assertFalse(proc.is_alive())
+		self.assertEquals(self.events, [(EXIT, 'proc')])
+	
+	def test_should_send_normal_exit_on_terminate(self):
+		def finish(proc):
+			proc.receive['die'] = lambda msg: proc.terminate()
+
+		pg.main.receive[pg.Exit, pg.Process] = lambda msg, proc: log_message(proc.error)
+		proc = main.spawn_link(finish, name='proc')
+		proc.send('die')
+		proc.wait(1)
+		self.assertFalse(proc.is_alive())
+		self.assertEquals(self.events, [('None',)])
+
+	def test_should_propagate_terminate_causes(self):
+		def finish(proc):
+			proc.receive['die'] = lambda msg: proc.terminate('fatality')
+
+		pg.main.receive[pg.Exit, pg.Process] = lambda msg, proc: log_message(proc.error)
+		proc = main.spawn_link(finish, name='proc')
+		proc.send('die')
+		proc.wait(1)
+		self.assertFalse(proc.is_alive())
+		self.assertEquals(self.events, [('fatality',)])
+
+	def test_should_repr_unpickleable_exceptions(self):
+		def die_unpickably(proc):
+			@proc.receiver('die')
+			def die(msg):
+				import threading
+				raise RuntimeError(threading.Lock())
+		
+		pg.main.receive[pg.Exit, pg.Process] = lambda msg, proc: log_message(type(proc.error).__name__)
+		proc = main.spawn_link(die_unpickably, name='proc')
+		proc.send('die')
+		proc.wait(1)
+		self.assertFalse(proc.is_alive())
+		self.assertEquals(self.events, [('UnpicklableForeignException',)])
+
+	def test_should_send_UnhandledChildExit(self):
+		pass
+
+	def test_should_send_error_exit_on_finish(self):
+		def finish_badly(proc):
+			@proc.receiver('die')
+			def die(msg):
+				raise RuntimeError("bad things are afoot")
+			proc.receive['die'] = lambda msg: proc.finish()
+
+		pg.main.receive[pg.Exit, pg.Process] = lambda msg, proc: log_message(proc.error)
+		proc = main.spawn_link(finish_badly, name='proc')
+		proc.send('die')
+		proc.wait(1)
+		self.assertFalse(proc.is_alive())
+		self.assertEquals(self.events, [('bad things are afoot',)])
+
+	def test_should_make_exit_error_available_in_a_non_linked_process(self):
+		def finish_badly(proc):
+			@proc.receiver('die')
+			def die(msg):
+				raise RuntimeError("bad things are afoot")
+
+		proc = main.spawn(finish_badly, name='proc')
+		proc.send('die')
+		proc.wait(1)
+		self.assertSameError(proc.error, RuntimeError('bad things are afoot'))
 
 	def test_should_die_on_unknown_message(self):
 		proc = main.spawn(ponger, name='ponger')
@@ -114,8 +209,8 @@ class AbstractProcessTest(object):
 			('spawn', '__main__'),
 			('spawned', 'dying_proc'),
 			('die',),
-			# we send 'die' to dying_proc, and it sends EXIT to first_proc
-			('EXIT', 'dying_proc'),
+			# we send 'die' to dying_proc, and it sends Exit to first_proc
+			(EXIT, 'dying_proc'),
 		])
 	
 	def test_default_exit_handler_should_exit(self):
@@ -166,7 +261,7 @@ class AbstractProcessTest(object):
 			('spawn', '__main__'),
 			('spawned', 'dying_proc'),
 			('die',),
-			(pg.EXIT, 'dying_proc'),
+			(EXIT, 'dying_proc'),
 		])
 
 	def kill_on_spawned(self):
@@ -196,7 +291,7 @@ class OSProcessTest(AbstractProcessTest, TestCase):
 	
 	def test_killing_main_should_kill__all__processes(self):
 		def monitor_exit(proc):
-			proc.receive[pg.EXIT] = log_message
+			proc.receive[pg.Exit] = log_message
 		
 		one = main.spawn(monitor_exit, 'one')
 		two = main.spawn(monitor_exit, 'two')
@@ -208,8 +303,8 @@ class OSProcessTest(AbstractProcessTest, TestCase):
 
 		# expect one exit message for each child
 		self.assertEquals(self.events, [
-			(pg.EXIT,),
-			(pg.EXIT,),
+			(EXIT,),
+			(EXIT,),
 		])
 
 

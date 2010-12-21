@@ -10,7 +10,30 @@ from paragram import pattern
 from receiver import ReceiverSetter, ReceiverDecorator
 log = logging.getLogger(__name__)
 
-EXIT = 'EXIT'
+def can_pickle(o):
+	try:
+		pickle.dumps(o)
+		return True
+	except pickle.PicklingError:
+		return False
+
+class UnpicklableForeignException(RuntimeError): pass
+class UnhandledChildExit(RuntimeError): pass
+
+class Exit(Exception):
+	def __init__(self, cause=None):
+		super(Exit, self).__init__(cause)
+		self.error = cause if can_pickle(cause) else UnpicklableForeignException(repr(cause))
+
+	def __str__(self):
+		return 'EXIT'
+	def __repr__(self):
+		return '<#EXIT: %r>' % (self.error,)
+	def __eq__(self, other):
+		return type(self) == type(other) and self.error == other.error
+
+
+#EXIT = 'EXIT'
 # an internal message used for killing off duplicated ThreadProcess objects
 __EXIT__ = ('__exit_silently__',)
 
@@ -21,27 +44,29 @@ class Process(object):
 	"""empty class for the purpose of inheritance"""
 	pass
 
-class PreventExit(Exception): pass
-
 class ProcessAPI(Process):
 	"""the public methods for all Process implementations"""
-	def terminate(self):
-		self.send(EXIT)
+	def terminate(self, error=None):
+		self.send(Exit(error))
 
 	def spawn_link(self, *a, **kw):
 		kw['link_to'] = self
 		return self.spawn(*a, **kw)
 	
-	def spawn(self, target, name=None, link_to=None, kind=None):
+	def spawn(self, target, name=None, link_to=None, kind=None, args=(), kwargs={}):
 		if kind is None:
 			import paragram
 			kind=paragram.default_type
-		return kind(target=target, link=link_to, name=name)
+		return kind(target=target, link=link_to, name=name, args=args, kwargs=kwargs)
 	
 	def send(self, *msg):
 		log.debug("sending msg: %s to process %s" % (msg, self))
 		self._queue.put(pickle.dumps(msg))
 
+	@property
+	def error(self):
+		return self._error_dict.get('error', None)
+	
 	def __repr__(self):
 		return "<#%s: %s [%s]>" % (type(self).__name__, self.name, os.getpid())
 	def __str__(self):
@@ -52,7 +77,7 @@ class BaseProcess(ProcessAPI):
 	_manager = None
 	_next_index = 1
 	"""common methods for local Process implementations"""
-	def __init__(self, target, link, name):
+	def __init__(self, target, link, name, args, kwargs):
 		self.pid = os.getpid()
 		self.name = name
 		if not self.name:
@@ -63,11 +88,14 @@ class BaseProcess(ProcessAPI):
 		if link is not None:
 			self._linked.append(link)
 		self._queue = self._get_manager().Queue()
-		self._exit_filter = pattern.genFilter((EXIT, Process))
+		self._error_dict = self._get_manager().dict()
+		self._child_exit_filter = pattern.genFilter((Exit, Process))
+		self._exit_filter = pattern.genFilter((Exit,))
 		self.receive = ReceiverSetter(self._handlers)
 		self.receiver = ReceiverDecorator(self._handlers)
-		#self._auto_exit = True
-	
+		self._target = target
+		self._args = args
+		self._kwargs = kwargs
 	
 	def _get_manager(self):
 		if BaseProcess._manager is None:
@@ -75,33 +103,35 @@ class BaseProcess(ProcessAPI):
 		return BaseProcess._manager
 	
 	def _exit_handler(self, exit, proc=None):
-		self.send(EXIT)
+		self.send(Exit(UnhandledChildExit(proc)))
 	
 	def _get(self):
 		return self._queue.get()
 
-	def _run(self, target):
+	def _run(self):
 		try:
-			target(self)
+			self._target(self, *self._args, **self._kwargs)
 			while True:
 				pickled = self._get()
 				self._receive(pickle.loads(pickled))
 		except SilentExit:
 			log.debug("duplicate %r exiting silently" % (self,))
-		except Exit:
-			self._exit()
+		except Exit, e:
+			log.warn("EXIT: %r" % (e,))
+			self._exit(e.error)
 		except UnhandledMessage, e:
+			log.warn(e)
+			self._exit(e)
+		except Exception, e:
 			log.error(e)
-			self._exit()
-		except Exception:
-			import traceback
-			traceback.print_exc(file=sys.stderr)
-			self._exit()
+			self._exit(e)
 
-	def _exit(self):
+	def _exit(self, cause):
+		self._error_dict['error'] = cause
+		log.info("error for %s set to %r" % (self, cause))
 		for linked in self._linked:
 			log.info("terminating linked process %s" % (linked.name,))
-			linked.send(EXIT, self)
+			linked.send(Exit(cause), self)
 		log.info("process %s ending" % (self.name,))
 
 	def _receive(self, msg):
@@ -109,7 +139,7 @@ class BaseProcess(ProcessAPI):
 		matched = False
 		if msg == __EXIT__:
 			raise SilentExit()
-		for filter, handler in self._handlers + [(self._exit_filter, self._exit_handler)]:
+		for filter, handler in self._handlers + [(self._child_exit_filter, self._exit_handler)]:
 			matched = False
 			try:
 				matched = filter(msg)
@@ -119,12 +149,15 @@ class BaseProcess(ProcessAPI):
 					args = msg
 				else:
 					args = (msg,)
-				handler(*args)
+				try:
+					handler(*args)
+				except Exception, e:
+					raise Exit(e)
 				break
 
-		if msg == (EXIT,):
+		if self._exit_filter(msg):
 			# always exit after the EXIT signal - no more processing allowed
-			raise Exit()
+			raise msg[0]
 
 		if not matched:
 			raise UnhandledMessage(msg)
@@ -139,20 +172,18 @@ class BaseProcess(ProcessAPI):
 		"""return an object safe for pickling, in this case
 		a proxy object that implements the Process API using only
 		this object's queue"""
-		return (ProxyProcess, (self.name, self._queue, self.pid))
+		return (ProxyProcess, (self.name, self._queue, self.pid, self._error_dict))
 
 class SilentExit(Exception): pass
-class Exit(RuntimeError):
-	def __init__(self, cause=None):
-		self.cause = cause
 
 class UnhandledMessage(RuntimeError):
 	def __str__(self):
 		return "Unhandled message: %r" % (self.args[0],)
 
 class ProxyProcess(ProcessAPI):
-	def __init__(self, name, queue, pid):
+	def __init__(self, name, queue, pid, error_dict):
 		self.name = name
 		self._queue = queue
 		self.pid = pid
+		self._error_dict = error_dict
 

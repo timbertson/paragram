@@ -1,1 +1,1 @@
-from base_process import Process, EXIT, Exit
+from base_process import Process, Exit
