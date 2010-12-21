@@ -4,6 +4,9 @@ from Queue import Empty
 import paragram as pg
 import logging
 
+# neat for debugging manager issues
+#multiprocessing.util.log_to_stderr()
+
 output = None
 main = None
 
@@ -107,6 +110,29 @@ class AbstractProcessTest(object):
 			('pong', 'ponger'),
 			(EXIT, 'ponger'),
 		])
+	
+	def test_linked_spawned_processes_should_receive_parent_exit_messages(self):
+		def child(proc):
+			proc.receive[pg.Exit, pg.Process] = log_and_exit
+
+		def parent(proc):
+			proc.receive['die'] = log_and(lambda *a: proc.terminate())
+			proc.receive['spawn'] = log_and(lambda *a: proc.spawn_link(target=child, name='child'))
+
+		parent_proc = pg.main.spawn(parent, name='parent')
+		parent_proc.send('spawn')
+		# see bug http://psf.upfronthosting.co.za/roundup/tracker/issue1731717
+		# (or maybe not. anyway, the sleep helps, and I don't think it's my fault)
+		import time
+		time.sleep(0.1)
+		parent_proc.send('die')
+		parent_proc.wait()
+		self.assertEquals(self.events, [
+			('spawn',),
+			('die',),
+			(EXIT, 'parent'),
+		])
+
 
 	def test_should_provide_arguments(self):
 		def takes_args(proc, a, b, c):
