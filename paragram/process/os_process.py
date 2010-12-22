@@ -1,12 +1,13 @@
 import multiprocessing
 import Queue as queue
 import os
+import sys
 import logging
 
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
-from base_process import BaseProcess, _send, Exit
+from base_process import BaseProcess
 
 # a thread-safe queue is fine here, each spawned process will
 # reset its list of _child_processes
@@ -20,9 +21,11 @@ class OSProcess(BaseProcess):
 		_child_processes.put(self)
 		self._proc = multiprocessing.Process(target=self._run, name=self.name)
 		self._proc.start()
+		self.pid = self._proc.pid
 	
 	def _run(self, *a):
 		self._init_new_process()
+		self.pid = os.getpid()
 		super(OSProcess, self)._run(*a)
 	
 	def _kill_existing_threads(self):
@@ -39,6 +42,8 @@ class OSProcess(BaseProcess):
 		import main
 		main.main = None
 		main._main = None
+		sys.stdin.close()
+		os.close(0)
 		# this is a brand new process - so we must not have any children yet
 		global _child_processes
 		_child_processes = queue.Queue()
