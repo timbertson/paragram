@@ -1,8 +1,9 @@
 # pattern.py
 #
-# Copyright (c) 2004 Michael Hobbs
+# Copyright (c) 2004 Michael Hobbs,
+# modifications by Tim Cuthbertson
 #
-# This file is part of Candygram.
+# This file was originally distributed as part of Candygram.
 #
 # Candygram is free software; you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -24,86 +25,72 @@ __revision__ = '$Id: pattern.py,v 1.9 2004/09/03 17:06:46 hobb0001 Exp $'
 
 
 import types
-import warnings
 
 
 # Generate a unique value for 'Any' so that it won't ever be confused with any
 # other value.
 Any = object()
+etc = object()
 
-def genFilter(pattern):
+def gen_filter(pattern):
 	"""generate a pattern filter"""
 	if isinstance(pattern, tuple) or isinstance(pattern, list):
-		result = genSeqFilter(pattern)
+		result = seq_filter(pattern)
 	elif isinstance(pattern, dict):
-		result = genDictFilter(pattern)
+		result = dict_filter(pattern)
 	elif isinstance(pattern, type) or type(pattern) is types.ClassType:
-		result = genTypeFilter(pattern)
+		result = type_filter(pattern)
 	elif callable(pattern):
-		result = genFuncFilter(pattern)
+		result = pattern
 	elif pattern is Any:
-		result = genAnyFilter()
+		result = any_filter
 	else:
-		result = genValueFilter(pattern)
+		result = value_filter(pattern)
 	return result
 
+def any_filter(x): return True
 
-def genAnyFilter():
-	"""gen filter for Any"""
-	return lambda x: True
+def value_filter(value):
+	def value_equals(x): return x == value
+	return value_equals
 
+def type_filter(t):
+	def instance_of(x): return isinstance(x, t)
+	return instance_of
 
-def genValueFilter(value):
-	"""gen filter for a specific value"""
-	return lambda x: x == value
-
-
-def genFuncFilter(func):
-	"""gen filter for a function"""
-	return func
-
-
-def genTypeFilter(t):
-	"""gen filter for a type check"""
-	return lambda x: isinstance(x, t)
-
-
-def genSeqFilter(seq):
+def seq_filter(seq):
 	"""gen filter for a sequence pattern"""
 	# Define these values as constants outside of the filt() function so that
 	# the filter will not have to re-calculate the values every time it's called.
-	lastFilter = None
-	if isinstance(seq, list) and seq:
-		lastFilter = genFilter(seq[-1])
+	allowLonger = False
+	if etc in seq:
+		# etc must come last
+		assert etc not in seq[:-1]
 		seq = seq[:-1]
-	seqType = type(seq)
+		allowLonger = True
 	seqLen = len(seq)
-	subFilters = [genFilter(pattern) for pattern in seq]
-	seqRange = range(seqLen)
+	subFilters = map(gen_filter, seq)
+	correct_type = type_filter(type(seq))
 	def filt(x):
 		"""resulting filter function"""
-		if not isinstance(x, seqType):
+		if not correct_type(x):
 			return False
 		if len(x) < seqLen:
 			return False
-		for i in seqRange:
-			if not subFilters[i](x[i]):
+		if len(x) > seqLen and not allowLonger:
+			return False
+		for subfilter, item in zip(subFilters, x):
+			if not subfilter(item):
 				return False
-			# end if
-		for value in x[seqLen:]:
-			# Don't allow any excess values if lastFilter hasn't been set.
-			if lastFilter is None or not lastFilter(value):
-				return False
-			# end if
 		return True
 	return filt
 
 
-def genDictFilter(dict_):
+def dict_filter(dict_):
 	"""gen filter for a dictionary pattern"""
 	subFilters = []
 	for key, pattern in dict_.items():
-		subFilters.append((key, genFilter(pattern)))
+		subFilters.append((key, gen_filter(pattern)))
 	def filt(x):
 		"""resulting filter function"""
 		for key, subFilter in subFilters:

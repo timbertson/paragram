@@ -44,7 +44,7 @@ def spawner(link_to_spawned, on_exit=None):
 	sending a 'spawned' message back to the sender
 	"""
 	def _spawner(proc):
-		@proc.receiver('spawn', pg.Process)
+		@proc.receive('spawn', pg.Process)
 		def spawn(msg, sender):
 			log_message(msg, sender)
 			spawnfn = proc.spawn_link if link_to_spawned else proc.spawn
@@ -136,7 +136,7 @@ class AbstractProcessTest(object):
 
 	def test_should_provide_arguments(self):
 		def takes_args(proc, a, b, c):
-			@proc.receiver('main', pg.Process)
+			@proc.receive('main', pg.Process)
 			def main(msg, p):
 				p.send(a + b + c)
 				proc.terminate()
@@ -179,7 +179,7 @@ class AbstractProcessTest(object):
 
 	def test_should_repr_unpickleable_exceptions(self):
 		def die_unpickably(proc):
-			@proc.receiver('die')
+			@proc.receive('die')
 			def die(msg):
 				import threading
 				raise RuntimeError(threading.Lock())
@@ -196,7 +196,7 @@ class AbstractProcessTest(object):
 
 	def test_should_send_error_exit_on_finish(self):
 		def finish_badly(proc):
-			@proc.receiver('die')
+			@proc.receive('die')
 			def die(msg):
 				raise RuntimeError("bad things are afoot")
 			proc.receive['die'] = lambda msg: proc.finish()
@@ -210,7 +210,7 @@ class AbstractProcessTest(object):
 
 	def test_should_make_exit_error_available_in_a_non_linked_process(self):
 		def finish_badly(proc):
-			@proc.receiver('die')
+			@proc.receive('die')
 			def die(msg):
 				raise RuntimeError("bad things are afoot")
 
@@ -299,7 +299,7 @@ class OSProcessTest(AbstractProcessTest, TestCase):
 
 	def test_only_root_process_can_add_receive_to_main(self):
 		def first_proc(proc):
-			@proc.receiver('go')
+			@proc.receive('go')
 			def go(msg):
 				try:
 					pg.main.receive['foo'] = lambda x: None

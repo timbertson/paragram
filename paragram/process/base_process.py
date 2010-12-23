@@ -6,7 +6,7 @@ import multiprocessing
 import logging
 
 from paragram import pattern
-from paragram.receiver import ReceiverSetter, ReceiverDecorator
+from paragram.receiver import Receiver
 log = logging.getLogger(__name__)
 
 def can_pickle(o):
@@ -93,9 +93,8 @@ class BaseProcess(ProcessAPI):
 			self._linked.append(link)
 		self._queue = self._get_manager().Queue()
 		self._error_dict = self._get_manager().dict({'error':None})
-		self._exit_filter = pattern.genFilter((Exit,))
-		self.receive = ReceiverSetter(self._handlers)
-		self.receiver = ReceiverDecorator(self._handlers)
+		self._exit_filter = pattern.gen_filter((Exit,))
+		self.receive = Receiver(self._handlers)
 		self._init_default_handlers()
 		self._target = target
 		self._args = args
@@ -104,7 +103,7 @@ class BaseProcess(ProcessAPI):
 	
 	def _init_default_handlers(self):
 		self._default_handlers = [
-			(pattern.genFilter((Exit, Process)), self._exit_handler)
+			(pattern.gen_filter((Exit, Process)), self._exit_handler)
 		]
 
 	def _get_manager(self):

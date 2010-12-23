@@ -14,13 +14,13 @@ def graph(filename="paragram.dot"):
 	def grapher(proc):
 		done = []
 		links = []
-		@proc.receiver(__GRAPH__, Process, list)
+		@proc.receive(__GRAPH__, Process, list)
 		def graph_proc(msg, sender, linked):
 			if done:
 				raise RuntimeError("graphing already complete - got late message from %r" % (sender,))
 			links.append((sender, linked))
 
-		@proc.receiver('done')
+		@proc.receive('done')
 		def complete(*a):
 			done.append(True)
 			with open(filename, 'w') as output:
