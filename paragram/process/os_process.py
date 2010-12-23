@@ -1,7 +1,6 @@
 import multiprocessing
 import Queue as queue
 import os
-import sys
 import logging
 
 log = logging.getLogger(__name__)
@@ -42,8 +41,6 @@ class OSProcess(BaseProcess):
 		import main
 		main.main = None
 		main._main = None
-		sys.stdin.close()
-		os.close(0)
 		# this is a brand new process - so we must not have any children yet
 		global _child_processes
 		_child_processes = queue.Queue()

@@ -109,7 +109,9 @@ class BaseProcess(ProcessAPI):
 
 	def _get_manager(self):
 		if BaseProcess._manager is None:
-			BaseProcess._manager = multiprocessing.Manager()
+			from paragram.managers import ParagramManager
+			BaseProcess._manager = ParagramManager()
+			BaseProcess._manager.start()
 		return BaseProcess._manager
 	
 	def _exit_handler(self, exit, proc=None):
@@ -130,7 +132,6 @@ class BaseProcess(ProcessAPI):
 			log.warn("%s EXIT: %r" % (self, e,))
 			self._exit(e.error)
 		except KeyboardInterrupt, e:
-			log.exception("Keyboard interrupt in process %s" % (self,))
 			self._exit(e)
 		except UnhandledMessage, e:
 			log.warn(e)
