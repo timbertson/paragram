@@ -6,7 +6,7 @@ import multiprocessing
 import logging
 
 from paragram import pattern
-from receiver import ReceiverSetter, ReceiverDecorator
+from paragram.receiver import ReceiverSetter, ReceiverDecorator
 log = logging.getLogger(__name__)
 
 def can_pickle(o):
