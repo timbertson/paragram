@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type='text/xsl' href='interface.xsl'?>
+<interface xmlns="http://zero-install.sourceforge.net/2004/injector/interface" uri="http://gfxmonk.net/dist/0install/paragram.xml">
+	<name>paragram</name>
+	<summary>erlang-style concurrency library for python</summary>
+	<description>
+	</description>
+	<group main="paragram">
+		<implementation id="sha1new=c02f0322f155b5d47c1ef61a48aab2d22a040075" released="2010-12-27" version="0.1">
+			<manifest-digest sha256="fe279303b7f251f588ba6520c2e80a615d21420f9ee032b7775828c8ac9ad749"/>
+			<archive href="http://gfxmonk.net/dist/0install/paragram/paragram-0.1.tgz" size="17244"/>
+		</implementation>
+	</group>
+</interface>
