@@ -4,7 +4,6 @@ import os
 import logging
 
 log = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG)
 
 from base_process import BaseProcess
 

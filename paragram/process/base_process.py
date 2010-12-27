@@ -128,7 +128,7 @@ class BaseProcess(ProcessAPI):
 		except SilentExit:
 			log.debug("duplicate %r exiting silently" % (self,))
 		except Exit, e:
-			log.warn("%s EXIT: %r" % (self, e,))
+			log.info("%s EXIT: %r" % (self, e,))
 			self._exit(e.error)
 		except KeyboardInterrupt, e:
 			self._exit(e)
