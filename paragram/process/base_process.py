@@ -168,6 +168,7 @@ class BaseProcess(ProcessAPI):
 				try:
 					handler(*args)
 				except Exception, e:
+					log.exception(e)
 					raise Exit(e)
 				break
 
