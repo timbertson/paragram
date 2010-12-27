@@ -25,7 +25,6 @@ def _init_main():
 	global _main
 	if _main is None:
 		_main = MainProcess()
-		print repr(_main)
 	return _main
 
 class MainProcess(ThreadProcess):
