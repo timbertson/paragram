@@ -4,6 +4,8 @@ import pickle
 import os
 import multiprocessing
 import logging
+import sys
+import traceback
 
 from paragram import pattern
 from paragram.receiver import Receiver
@@ -136,7 +138,7 @@ class BaseProcess(ProcessAPI):
 			log.warn(e)
 			self._exit(e)
 		except Exception, e:
-			log.exception("exception encountered in process %s:" % (self,))
+			traceback.print_exc(file=sys.stderr)
 			self._exit(e)
 
 	def _exit(self, cause):
@@ -168,7 +170,7 @@ class BaseProcess(ProcessAPI):
 				try:
 					handler(*args)
 				except Exception, e:
-					log.exception(e)
+					traceback.print_exc(file=sys.stderr)
 					raise Exit(e)
 				break
 
