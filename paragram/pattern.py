@@ -19,11 +19,6 @@
 # along with Candygram; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-"""Pattern filter generator"""
-
-__revision__ = '$Id: pattern.py,v 1.9 2004/09/03 17:06:46 hobb0001 Exp $'
-
-
 import types
 
 

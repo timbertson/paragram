@@ -8,7 +8,7 @@ log = logging.getLogger(__name__)
 _main = None
 
 class LazyMain(Process):
-	def __getattr__(self, attr):
+	def __getattribute__(self, attr):
 		return getattr(_init_main(), attr)
 
 	def __setattr__(self, attr, val):

@@ -22,6 +22,14 @@ class UnpicklableForeignException(RuntimeError): pass
 class UnhandledChildExit(RuntimeError): pass
 
 class Exit(Exception):
+	"""
+	When this exception is raised, it has the same effect
+	as calling :func:`~Process.terminate` on the running
+	process.
+
+	:member error: The exception that causes this process to exit.
+		This is ``None`` in the case of a call to ``terminate()``
+	"""
 	def __init__(self, cause=None):
 		while isinstance(cause, Exit):
 			cause = cause.error
@@ -44,11 +52,86 @@ def _send(queue, *msg):
 	queue.put(pickle.dumps(msg))
 
 class Process(object):
-	"""empty class for the purpose of inheritance"""
-	pass
+	"""
+	The base class of all paragram Process objects.
+
+	:member: error
+
+		If a process terminates with an error, this attribute is set to the exception instance.
+		In all other cases, it is ``None``
+	"""
+	def terminate(self, error=None):
+		"""Send an exit message to this process"""
+		raise NotImplementedError(type(self))
+
+	def send(self, *msg):
+		"""
+		Send a message to this process
+		"""
+		raise NotImplementedError(type(self))
+
+	def is_alive(self):
+		"""
+		Typically, :func:`wait` is a better choice.
+		"""
+		raise NotImplementedError(type(self))
+
+	def wait(self, timeout=None):
+		"""
+		Wait for this process to finish
+		"""
+		raise NotImplementedError(type(self))
+	
+class LocalProcess(Process):
+	"""
+	Code running inside a process can use these methods on the process
+	object, in addition to the public methods provided by
+	:class:`paragram.Process`
+
+	:member: receive
+
+		Used to set a new receiver, with either of two syntaxes:
+
+			>>> process.receive[message] = handler
+
+		or:
+
+			>>> @process.receive(message)
+			>>> def handler(...):
+			...     # ...
+	
+		For more information, see :ref:`handling_messages`
+	"""
+
+	def spawn(self, target, name=None, link_to=None, kind=None, args=(), kwargs={}):
+		"""
+		Spawn a new process. ``target`` is called with the newly-created process
+		as its first argument, followed by ``args`` and ``kwargs`` (if present).
+
+		``target`` is responsible for setting up any receivers on the process and
+		sending any initial messages. After that, the process will run until terminated.
+
+		:param target: The callable that will be used to init this process.
+		:param name: Name of this process, for use in logging, etc.
+		:param link_to: used by :func:`~paragram.process.base_process.LocalProcess.spawn_link` to link the newly-created process to
+			an existing process.
+		:param kind: The class of this process. Should be either :class:`~paragram.OSProcess` or
+			:class:`~paragram.ThreadProcess`.
+		:param args: extra arguments to pass to ``target``
+		:param kwargs: extra keyword arguments to pass to ``target``
+		
+		"""
+		raise NotImplementedError
+
+	def spawn_link():
+		"""
+		This function calls :func:`~paragram.process.base_process.LocalProcess.spawn` with all provided arguments, setting ``link_to`` to ``self``.
+		"""
+		raise NotImplementedError
+
 
 class ProcessAPI(Process):
-	"""the public methods for all Process implementations"""
+	"""Default implementation of all public methods for all Process implementations"""
 	def terminate(self, error=None):
 		self.send(Exit(error))
 
