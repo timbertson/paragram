@@ -27,9 +27,11 @@ help:
 	@echo "  linkcheck to check all external links for integrity"
 	@echo "  doctest   to run all doctests embedded in the documentation (if enabled)"
 
+0:
+	mkzero-gfxmonk paragram.xml -p setup.py -p paragram
 doc: html copy
 copy:
-	#rsync -avz --delete doc/build/html/ ~/Sites/gfxmonk/dist/doc/mocktest/
+	rsync -avz --delete doc/build/html/ ~/Sites/gfxmonk/dist/doc/paragram/
 clean:
 	-rm -rf $(BUILDDIR)/html/*
 

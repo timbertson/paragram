@@ -4,16 +4,37 @@
 	<name>paragram</name>
 	<summary>erlang-style concurrency library for python</summary>
 	<description>
+Paragram is an erlang-style concurrency framework for python. This is also known
+as an `actor-based concurrency model &lt;http://en.wikipedia.org/wiki/Actor_model&gt;`_,
+as it consists of multiple independent `actors` sending messages to each other.
+
+Paragram started as a fork of `candygram`_
+adding true concurrency using threads and processes, but diverged enough to become its
+own library.
+
+**For documentation, installation**, etc, please see the
+`online documentation &lt;http://gfxmonk.net/dist/doc/paragram/doc/&gt;`_
+
+.. _candygram: http://candygram.sourceforge.net/
 	</description>
 	<homepage>http://github.com/gfxmonk/paragram</homepage>
-	<group main="paragram">
+	<rich-description xmlns="http://gfxmonk.net/dist/0install" xmlns:h="http://www.w3.org/1999/xhtml">
+		<h:p>Paragram is an erlang-style concurrency framework for python. This is also known as an <h:a href="http://en.wikipedia.org/wiki/Actor_model">actor-based concurrency model</h:a>, as it consists of multiple independent `actors` sending messages to each other.</h:p>
+		<h:p>Paragram started as a fork of <h:a href="http://candygram.sourceforge.net/">candygram</h:a> adding true concurrency using threads and processes, but diverged enough to become its own library.</h:p>
+		<h:p><h:strong>For documentation, installation</h:strong>, etc, please see the <h:a href="http://gfxmonk.net/dist/doc/paragram/doc/">online documentation</h:a></h:p>
+	</rich-description>
+	<group>
 		<implementation id="sha1new=c02f0322f155b5d47c1ef61a48aab2d22a040075" released="2010-12-27" version="0.1">
 			<manifest-digest sha256="fe279303b7f251f588ba6520c2e80a615d21420f9ee032b7775828c8ac9ad749"/>
 			<archive href="http://gfxmonk.net/dist/0install/paragram/paragram-0.1.tgz" size="17244"/>
 		</implementation>
 		<implementation id="sha1new=ca184bfa5299b328b0880745c9e87400fc311746" released="2010-12-27" version="0.1.1">
-    <manifest-digest sha256="bc41c48d05c7c4523a739caeeb7d8c689515915c11b5a8211e63ec268f4f412b"/>
-    <archive href="http://gfxmonk.net/dist/0install/paragram/paragram-0.1.1.tgz" size="17421"/>
+			<manifest-digest sha256="bc41c48d05c7c4523a739caeeb7d8c689515915c11b5a8211e63ec268f4f412b"/>
+			<archive href="http://gfxmonk.net/dist/0install/paragram/paragram-0.1.1.tgz" size="17421"/>
+		</implementation>
+		<implementation id="sha1new=579848ca250578b90e236fd5a91c57a33034269d" released="2011-01-05" version="0.1.2">
+    <manifest-digest sha256="69730523263f37581d813bf443f6ca9d528055968d95124d1558baebd0a4f5ec"/>
+    <archive href="http://gfxmonk.net/dist/0install/paragram/paragram-0.1.2.tgz" size="19819"/>
   </implementation>
 	</group>
 </interface>

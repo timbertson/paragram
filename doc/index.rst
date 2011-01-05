@@ -34,7 +34,7 @@ For more information on zero install and how to create your own feeds
 (it's really simple!), see the `zero-install developer guide <http://zero-install.sourceforge.net/dev.html>`_
 
 But if you just want to try it out quickly, you can use pypi
-(via ``easy_install paragram`` or ``pip install paragram``)
+(``pip install paragram``)
 
 Performance
 ===========
