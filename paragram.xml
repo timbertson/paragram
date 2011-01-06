@@ -3,6 +3,7 @@
 <interface uri="http://gfxmonk.net/dist/0install/paragram.xml" xmlns="http://zero-install.sourceforge.net/2004/injector/interface">
 	<name>paragram</name>
 	<summary>erlang-style concurrency library for python</summary>
+	<publish mode="featured" xmlns="http://gfxmonk.net/dist/0install"/>
 	<description>
 Paragram is an erlang-style concurrency framework for python. This is also known
 as an `actor-based concurrency model &lt;http://en.wikipedia.org/wiki/Actor_model&gt;`_,
@@ -33,8 +34,8 @@ own library.
 			<archive href="http://gfxmonk.net/dist/0install/paragram/paragram-0.1.1.tgz" size="17421"/>
 		</implementation>
 		<implementation id="sha1new=579848ca250578b90e236fd5a91c57a33034269d" released="2011-01-05" version="0.1.2">
-    <manifest-digest sha256="69730523263f37581d813bf443f6ca9d528055968d95124d1558baebd0a4f5ec"/>
-    <archive href="http://gfxmonk.net/dist/0install/paragram/paragram-0.1.2.tgz" size="19819"/>
-  </implementation>
+			<manifest-digest sha256="69730523263f37581d813bf443f6ca9d528055968d95124d1558baebd0a4f5ec"/>
+			<archive href="http://gfxmonk.net/dist/0install/paragram/paragram-0.1.2.tgz" size="19819"/>
+		</implementation>
 	</group>
 </interface>
