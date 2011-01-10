@@ -20,11 +20,14 @@ own library.
 	</description>
 	<homepage>http://github.com/gfxmonk/paragram</homepage>
 	<rich-description xmlns="http://gfxmonk.net/dist/0install" xmlns:h="http://www.w3.org/1999/xhtml">
-		<h:p>Paragram is an erlang-style concurrency framework for python. This is also known as an <h:a href="http://en.wikipedia.org/wiki/Actor_model">actor-based concurrency model</h:a>, as it consists of multiple independent `actors` sending messages to each other.</h:p>
-		<h:p>Paragram started as a fork of <h:a href="http://candygram.sourceforge.net/">candygram</h:a> adding true concurrency using threads and processes, but diverged enough to become its own library.</h:p>
-		<h:p><h:strong>For documentation, installation</h:strong>, etc, please see the <h:a href="http://gfxmonk.net/dist/doc/paragram/doc/">online documentation</h:a></h:p>
+		<div xmlns="http://www.w3.org/1999/xhtml">
+			<p>Paragram is an erlang-style concurrency framework for python. This is also known as an <a href="http://en.wikipedia.org/wiki/Actor_model">actor-based concurrency model</a>, as it consists of multiple independent `actors` sending messages to each other.</p>
+			<p>Paragram started as a fork of <a href="http://candygram.sourceforge.net/">candygram</a> adding true concurrency using threads and processes, but diverged enough to become its own library.</p>
+			<p><strong>For documentation, installation</strong>, etc, please see the <a href="http://gfxmonk.net/dist/doc/paragram/doc/">online documentation</a></p>
+		</div>
 	</rich-description>
 	<group>
+		<environment insert="" mode="append" name="PYTHONPATH"/>
 		<implementation id="sha1new=c02f0322f155b5d47c1ef61a48aab2d22a040075" released="2010-12-27" version="0.1">
 			<manifest-digest sha256="fe279303b7f251f588ba6520c2e80a615d21420f9ee032b7775828c8ac9ad749"/>
 			<archive href="http://gfxmonk.net/dist/0install/paragram/paragram-0.1.tgz" size="17244"/>
