@@ -209,7 +209,12 @@ class BaseProcess(ProcessAPI):
 			self._target(self, *self._args, **self._kwargs)
 			while True:
 				pickled = self._get()
-				self._receive(pickle.loads(pickled))
+				try:
+					obj = pickle.loads(pickled)
+				except StandardError:
+					logging.fatal("Couldn't unpickle data: %r" % (pickled,))
+					raise
+				self._receive(obj)
 		except SilentExit:
 			log.debug("duplicate %r exiting silently" % (self,))
 		except Exit, e:
