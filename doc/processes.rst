@@ -18,10 +18,10 @@ This means that while handling a message, a process cannot be *interrupted*, so
 a process need not protect its internals with a lock or any other thread-safety
 measures.
 
-It also means that messages should be considered to be immediate - they can be
+It also means that messages should not be considered to be immediate - they can be
 queued for an arbitrary amount of time, depending on how busy the receiving
-process is. Because of this, you should make sure that your process blocks
-indefinitely - that means messages will *never* be delivered, including termination
+process is. Because of this, you should make sure that your process never blocks
+indefinitely - if you do, messages will *never* be delivered, including termination
 messages - and then your app won't shut down.
 
 As an implementation detail, a paragram process can either be implemented as a
@@ -139,7 +139,7 @@ By default, a process receiving such a message will itself terminate. But you ca
 override that behaviour like so:
 
 	>>> import paragram as pg
-	>>> @proc.receive[pg.Exit, pg.Process]
+	>>> @proc.receive(pg.Exit, pg.Process)
 	>>> def linked_terminated(exit, proc):
 	...     pass # handle however you like
 
