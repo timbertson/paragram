@@ -1,3 +1,5 @@
+.. image:: http://gfxmonk.net/dist/status/project/paragram.png
+
 Paragram is an erlang-style concurrency framework for python. This is also known
 as an `actor-based concurrency model <http://en.wikipedia.org/wiki/Actor_model>`_,
 as it consists of multiple independent `actors` sending messages to each other.
