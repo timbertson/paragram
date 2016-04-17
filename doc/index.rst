@@ -1,3 +1,5 @@
+.. image:: http://gfxmonk.net/dist/status/project/paragram.png
+
 What is paragram?
 =================
 
@@ -19,22 +21,6 @@ Documentation Sections:
    pattern-matching
    api
 
-
-Installing
-==========
-
-The author thoroughly recommends using zero install to manage dependencies.
-To add a dependency on paragram, the following snippet can be used in your feed::
-
-		<requires interface="http://gfxmonk.net/dist/0install/paragram.xml">
-			<environment insert="" mode="prepend" name="PYTHONPATH"/>
-		</requires>
-
-For more information on zero install and how to create your own feeds
-(it's really simple!), see the `zero-install developer guide <http://zero-install.sourceforge.net/dev.html>`_
-
-But if you just want to try it out quickly, you can use pypi
-(``pip install paragram``)
 
 Performance
 ===========
